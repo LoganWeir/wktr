@@ -83,7 +83,7 @@ def cmd_add(ctx: Context, branch: str, create_branch: bool):
         sys.stderr.write(f"Failed to create worktree: {e}\n")
         return 1
 
-def _do_rm(wt: Worktree, force: bool) -> int:
+def _do_rm(wt: Worktree, force: bool, git_cwd: Path) -> int:
     if wt.status.is_main:
         sys.stderr.write("Cannot delete main worktree.\n")
         return 1
@@ -109,7 +109,7 @@ def _do_rm(wt: Worktree, force: bool) -> int:
         if force:
             args.append("--force")
         args.append(str(wt.path))
-        run_git(args, cwd=wt.path.parent)
+        run_git(args, cwd=git_cwd)
         sys.stderr.write(f"Removed worktree {wt.path.name}\n")
         return 0
     except GitError as e:
@@ -134,7 +134,7 @@ def cmd_rm(ctx: Context, target: str, force: bool):
         sys.stderr.write(f"Worktree not found: {target}\n")
         return 1
         
-    return _do_rm(wt_to_rm, force)
+    return _do_rm(wt_to_rm, force, ctx.main_repo)
 
 def cmd_pick(ctx: Context):
     if ctx.kind == ContextKind.UNKNOWN:
@@ -169,6 +169,6 @@ def cmd_pick(ctx: Context):
             emit_cd_target(wt.path)
             return 0
         elif action == 'rm':
-            return _do_rm(wt, force=False)
+            return _do_rm(wt, force=False, git_cwd=ctx.main_repo)
             
     return 1
