@@ -116,6 +116,7 @@ def _do_rm(wt: Worktree, force: bool, git_cwd: Path) -> int:
         sys.stderr.write("Worktree is locked. Use --force to delete.\n")
         return 1
         
+    confirmed_dirty = False
     if not wt.status.is_clean and not force:
         sys.stderr.write(f"Worktree has uncommitted changes. Type the dirname ({wt.path.name}) to confirm: ")
         sys.stderr.flush()
@@ -124,13 +125,14 @@ def _do_rm(wt: Worktree, force: bool, git_cwd: Path) -> int:
             if ans != wt.path.name:
                 sys.stderr.write("Aborted.\n")
                 return 1
+            confirmed_dirty = True
         except (EOFError, KeyboardInterrupt):
             sys.stderr.write("\nAborted.\n")
             return 1
             
     try:
         args = ["worktree", "remove"]
-        if force:
+        if force or confirmed_dirty:
             args.append("--force")
         args.append(str(wt.path))
         run_git(args, cwd=git_cwd)

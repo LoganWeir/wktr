@@ -34,6 +34,29 @@ def test_rm_removes_worktree_from_main_repo(tmp_path):
     assert str(worktree_dir) not in worktrees
 
 
+def test_rm_removes_dirty_worktree_after_confirmation(tmp_path, monkeypatch):
+    repos_root = tmp_path / "repos"
+    repo_dir = repos_root / "repo"
+    worktree_dir = repos_root / "worktrees" / "repo" / "feature"
+    repo_dir.mkdir(parents=True)
+    worktree_dir.parent.mkdir(parents=True)
+
+    subprocess.run(["git", "init"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo_dir, check=True)
+    subprocess.run(
+        ["git", "worktree", "add", "-b", "feature", str(worktree_dir)],
+        cwd=repo_dir,
+        check=True,
+    )
+    (worktree_dir / "dirty.txt").write_text("dirty\n")
+    monkeypatch.setattr("builtins.input", lambda: "feature")
+
+    ctx = detect(repo_dir)
+
+    assert cmd_rm(ctx, "feature", force=False) == 0
+    assert not worktree_dir.exists()
+
+
 def test_add_creates_tracking_worktree_for_remote_only_branch(tmp_path):
     repos_root = tmp_path / "repos"
     origin_dir = tmp_path / "origin.git"
