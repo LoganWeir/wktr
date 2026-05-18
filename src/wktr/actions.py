@@ -74,7 +74,11 @@ def cmd_add(ctx: Context, branch: str, create_branch: bool):
         if create_branch:
             run_git(["worktree", "add", "-b", branch, str(target_path)], cwd=ctx.main_repo)
         else:
-            run_git(["worktree", "add", str(target_path), branch], cwd=ctx.main_repo)
+            remote_ref = _resolve_remote_tracking_branch(ctx.main_repo, branch)
+            if remote_ref:
+                run_git(["worktree", "add", "--track", "-b", branch, str(target_path), remote_ref], cwd=ctx.main_repo)
+            else:
+                run_git(["worktree", "add", str(target_path), branch], cwd=ctx.main_repo)
             
         sys.stderr.write(f"Created worktree at {target_path}\n")
         emit_cd_target(target_path)
@@ -82,6 +86,26 @@ def cmd_add(ctx: Context, branch: str, create_branch: bool):
     except GitError as e:
         sys.stderr.write(f"Failed to create worktree: {e}\n")
         return 1
+
+def _resolve_remote_tracking_branch(main_repo: Path, branch: str) -> Optional[str]:
+    """Return a remote-tracking ref for branch when no local branch exists."""
+    try:
+        run_git(["show-ref", "--verify", f"refs/heads/{branch}"], cwd=main_repo)
+        return None
+    except GitError:
+        pass
+
+    try:
+        out = run_git(["for-each-ref", "--format=%(refname:short)", f"refs/remotes/*/{branch}"], cwd=main_repo)
+    except GitError:
+        return None
+
+    refs = [line for line in out.splitlines() if line and not line.endswith("/HEAD")]
+    if f"origin/{branch}" in refs:
+        return f"origin/{branch}"
+    if len(refs) == 1:
+        return refs[0]
+    return None
 
 def _do_rm(wt: Worktree, force: bool, git_cwd: Path) -> int:
     if wt.status.is_main:
